@@ -17,75 +17,87 @@
 // Note: This will help ensure that reads and writes do not occur all at once
 // Use pthreads, mutexes, and condition variables to synchronize access to the shared variable
 
-void main() {
+#include <stdio.h>
+#include <pthread.h>
+
+void* writer();
+void* reader();
+
+int shared_var = 0;
+int num_readers = 0;
+pthread_mutex_t* m_shared_var;
+pthread_mutexattr_t* m_attr_shared_var;
+pthread_cond_t* write_ready;
+
+int main(void) {
 	int NUM_WRITE_THREADS = 5;
-	int NUM_READ_THREAS = 5;
-	int shared_var = 0;
-	int num_readers = 0;
-	pthread_mutex_t m_shared_var = init_mutex();
-	pthread_mutex_t m_num_readers = init_mutex();
-	pthread_cond_t write_ready;
-	pthread_cond_t read_ready;
+	int NUM_READ_THREADS = 5;
+	//pthread_mutex_t m_num_readers = init_mutex();
+	//pthread_cond_t read_ready;
 	pthread_t *writers[NUM_WRITE_THREADS]; 
 	pthread_t *readers[NUM_READ_THREADS];
 
+	// Initialize mutex
+	pthread_mutexattr_init(m_attr_shared_var);
+	pthread_mutex_init(m_shared_var, m_attr_shared_var);
+
 	// Create write threads
-	for (i=0; i < 5; i++) {
-		if ( pthread_create(&writers[i], NULL, &producer, NULL) != 0 ) { 
+	for (int i=0; i < 5; i++) {
+		if ( pthread_create(writers[i], NULL, writer, NULL) != 0 ) { 
 			printf("Couldn't create write thread number %d", i);
 		}
 	}
 
 	// Create read threads
-	for (i=0; i < 5; i++) {
-		if ( pthread_create(&readers[i], NULL, &producer, NULL) != 0 ) { 
+	for (int i=0; i < 5; i++) {
+		if ( pthread_create(readers[i], NULL, reader, NULL) != 0 ) { 
 			printf("Couldn't create read thread number %d", i);
 		}
 		else num_readers += 1; 
 	}
 
 	// Join write threads
-	for (i=0; i < 5; i++) { 
-		pthread_join(writers[i]);
+	for (int i=0; i < 5; i++) { 
+		pthread_join(*writers[i], NULL);
 	}
 
 	// Join read threads
-	for (i=0; i < 5; i++) {
-		pthread_join(readers[i]);
+	for (int i=0; i < 5; i++) {
+		pthread_join(*readers[i], NULL);
 	}
 	
 	return 0;
 }
 
-void writer() {
+void* writer() {
 	// Check predicate
 	while (num_readers != 0) {
-		pthread_cond_wait(&write_ready, &m_shared_var);
+		pthread_cond_wait(write_ready, m_shared_var);
 	} 
 
 	// Lock and modify
-	pthread_mutex_lock(&m_shared_var);
+	pthread_mutex_lock(m_shared_var);
 		shared_var += 1; 	
-	pthread_mutex_unlock(&m_shared_var);
+	pthread_mutex_unlock(m_shared_var);
 
 	// Signal next writer
-	pthread_signal(&write_ready);
+	pthread_cond_signal(write_ready);
+	
+	pthread_exit(NULL);
 }
 
-void reader() {
-	pthread_mutex_lock(&m_shared_var, 'r')
-		printf("Value of shared_var: %d\n", shared_var);
-		printf("Number of readers: %d\n", num_readers);
-	pthread_mutex_unlock(&m_shared_var)
+void* reader() {
+	// Print values
+	printf("Value of shared_var: %d\n", shared_var);
+	printf("Number of readers: %d\n", num_readers);
 
-	while {
-		pthread_cond_wait(&c_num_reader, &m_num_reader); 
-	}
-	pthread_mutex_lock(&m_num_reader);
-		num_reader -= 1;
-	pthread_mutex_unlock(&m_num_reader);
+	// Decrement number of readers
+	num_readers -= 1;
 
-	if num_reader == 0 {
-		pthread_signal(&write_ready)
+	// Signal writers if no more readers
+	if (num_readers == 0) {
+		pthread_cond_signal(write_ready);
 	}
+
+	pthread_exit(NULL);
 }
