@@ -1,5 +1,8 @@
+CC=gcc
+CFLAGS=-std=c11 -lpthread -g
+
 readers_and_writers: ps1_priority_readers_and_writers.c
-	gcc -g ps1_priority_readers_and_writers.c -o ../bin/$@
+	$(CC) ps1_priority_readers_and_writers.c -o ../bin/$@ $(CFLAGS)
 
 clean: 
 	rm -rf ../bin/*
